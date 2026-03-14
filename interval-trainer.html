@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interval Trainer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap');
+
+  :root {
+    --run: #ff4d1c;
+    --walk: #1caaff;
+    --warm: #f0b429;
+    --cool: #44dd88;
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --text: #f0f0f0;
+    --muted: #555;
+    --radius: 16px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Space Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    gap: 20px;
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(2rem, 6vw, 3.5rem);
+    letter-spacing: 0.12em;
+    color: var(--text);
+    text-align: center;
+  }
+
+  .config {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    width: 100%;
+    max-width: 660px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 20px 16px;
+    border: 1px solid #222;
+  }
+
+  .config-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .config-item label {
+    font-size: 0.58rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .config-item .value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    line-height: 1;
+  }
+
+  .btn-row { display: flex; gap: 6px; }
+
+  .btn-sm {
+    background: #222;
+    border: none;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.9rem;
+    width: 30px; height: 30px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-sm:hover { background: #333; }
+
+  /* PIPELINE */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 0.82rem;
+    letter-spacing: 0.1em;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .pipe-item {
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: #1a1a24;
+    color: var(--muted);
+    transition: background 0.3s, color 0.3s;
+    white-space: nowrap;
+  }
+
+  .pipe-item.active-warm { background: var(--warm); color: #000; }
+  .pipe-item.active-run  { background: var(--run);  color: #fff; }
+  .pipe-item.active-walk { background: var(--walk); color: #fff; }
+  .pipe-item.active-cool { background: var(--cool); color: #000; }
+  .pipe-sep { color: #333; }
+
+  /* TIMER */
+  .timer-wrap {
+    position: relative;
+    width: 270px; height: 270px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  svg.ring {
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .track { fill: none; stroke: #1a1a24; stroke-width: 14; }
+
+  .progress-ring {
+    fill: none;
+    stroke-width: 14;
+    stroke-linecap: round;
+    /* NO CSS transition — we update every frame so it's always smooth */
+  }
+
+  .timer-inner { text-align: center; z-index: 1; }
+
+  .phase-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem;
+    letter-spacing: 0.2em;
+    transition: color 0.4s;
+  }
+
+  .time-display {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 4.5rem;
+    line-height: 1;
+    transition: color 0.4s;
+  }
+
+  .interval-count {
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  /* CONTROLS */
+  .controls { display: flex; gap: 16px; }
+
+  .btn-main {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem;
+    letter-spacing: 0.15em;
+    padding: 14px 36px;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  .btn-main:active { transform: scale(0.96); }
+  .btn-start { background: var(--run); color: #fff; }
+  .btn-reset { background: #1a1a24; color: var(--muted); border: 1px solid #333; }
+  .btn-reset:hover { color: var(--text); border-color: #555; }
+
+  /* DOTS */
+  .intervals-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    justify-content: center;
+    max-width: 560px;
+    padding: 0 8px;
+  }
+
+  .interval-dot {
+    width: 24px; height: 7px;
+    border-radius: 4px;
+    background: #1a1a24;
+    transition: background 0.3s;
+  }
+  .interval-dot.done-run  { background: var(--run); }
+  .interval-dot.done-walk { background: var(--walk); }
+  .interval-dot.active { animation: pulse 0.8s infinite alternate; }
+
+  @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
+
+  .done-msg {
+    display: none;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem;
+    letter-spacing: 0.15em;
+    color: var(--cool);
+    text-align: center;
+    animation: fadeIn 0.5s;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } }
+
+  /* wake lock indicator */
+  .wakelock-badge {
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-align: center;
+  }
+  .wakelock-badge.on { color: var(--cool); }
+
+  @media (max-width: 500px) {
+    .config { grid-template-columns: repeat(3, 1fr); }
+    .timer-wrap { width: 220px; height: 220px; }
+    .time-display { font-size: 3.5rem; }
+    .config-item .value { font-size: 1.6rem; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Interval Trainer</h1>
+
+<div class="config" id="configPanel">
+  <div class="config-item">
+    <label style="color:var(--warm)">🔥 Warm-up (sec)</label>
+    <div class="value" style="color:var(--warm)" id="warmVal">120</div>
+    <div class="btn-row">
+      <button class="btn-sm" onclick="adjust('warm',-15)">−</button>
+      <button class="btn-sm" onclick="adjust('warm',15)">+</button>
+    </div>
+  </div>
+  <div class="config-item">
+    <label style="color:var(--run)">🏃 Corsa (sec)</label>
+    <div class="value" style="color:var(--run)" id="runVal">60</div>
+    <div class="btn-row">
+      <button class="btn-sm" onclick="adjust('run',-5)">−</button>
+      <button class="btn-sm" onclick="adjust('run',5)">+</button>
+    </div>
+  </div>
+  <div class="config-item">
+    <label>🔁 Ripetizioni</label>
+    <div class="value" id="repsVal">8</div>
+    <div class="btn-row">
+      <button class="btn-sm" onclick="adjust('reps',-1)">−</button>
+      <button class="btn-sm" onclick="adjust('reps',1)">+</button>
+    </div>
+  </div>
+  <div class="config-item">
+    <label style="color:var(--walk)">🚶 Camminata (sec)</label>
+    <div class="value" style="color:var(--walk)" id="walkVal">30</div>
+    <div class="btn-row">
+      <button class="btn-sm" onclick="adjust('walk',-5)">−</button>
+      <button class="btn-sm" onclick="adjust('walk',5)">+</button>
+    </div>
+  </div>
+  <div class="config-item">
+    <label style="color:var(--cool)">❄️ Cool-down (sec)</label>
+    <div class="value" style="color:var(--cool)" id="coolVal">180</div>
+    <div class="btn-row">
+      <button class="btn-sm" onclick="adjust('cool',-15)">−</button>
+      <button class="btn-sm" onclick="adjust('cool',15)">+</button>
+    </div>
+  </div>
+</div>
+
+<!-- PIPELINE -->
+<div class="pipeline">
+  <div class="pipe-item" id="pipe-warm">🔥 WARM-UP</div>
+  <span class="pipe-sep">›</span>
+  <div class="pipe-item" id="pipe-run">🏃 CORSA</div>
+  <span class="pipe-sep">/</span>
+  <div class="pipe-item" id="pipe-walk">🚶 CAMMINATA</div>
+  <span class="pipe-sep">›</span>
+  <div class="pipe-item" id="pipe-cool">❄️ COOL-DOWN</div>
+</div>
+
+<!-- TIMER -->
+<div class="timer-wrap">
+  <svg class="ring" viewBox="0 0 270 270">
+    <circle class="track" cx="135" cy="135" r="121"/>
+    <circle class="progress-ring" id="progressRing" cx="135" cy="135" r="121"/>
+  </svg>
+  <div class="timer-inner">
+    <div class="phase-label" id="phaseLabel">PRONTO</div>
+    <div class="time-display" id="timeDisplay">—</div>
+    <div class="interval-count" id="intervalCount">— / —</div>
+  </div>
+</div>
+
+<div class="done-msg" id="doneMsg">✓ Allenamento completato!</div>
+
+<div class="controls">
+  <button class="btn-main btn-start" id="startBtn" onclick="toggleStart()">INIZIA</button>
+  <button class="btn-main btn-reset" onclick="resetAll()">RESET</button>
+</div>
+
+<div class="intervals-grid" id="dotsGrid"></div>
+<div class="wakelock-badge" id="wakeBadge">⚫ schermo libero di spegnersi</div>
+
+<script>
+// ===================== CONFIG =====================
+const cfg = { warm: 120, run: 60, walk: 30, reps: 8, cool: 180 };
+const limits = { warm:[0,600], run:[5,300], walk:[5,300], reps:[1,30], cool:[0,600] };
+
+function adjust(key, delta) {
+  if (running) return;
+  cfg[key] = Math.min(limits[key][1], Math.max(limits[key][0], cfg[key] + delta));
+  document.getElementById(key+'Val').textContent = cfg[key];
+  buildDots();
+}
+
+// ===================== STATE =====================
+let running = false;
+let rafId = null;
+let currentPhase = 'warmup'; // warmup | run | walk | cooldown
+let currentRep = 0;
+let phaseStartTime = 0;   // Date.now() when current phase started
+let phaseDuration = 0;    // total ms for current phase
+let pausedAt = 0;         // Date.now() when paused
+let pausedRemaining = 0;  // ms remaining when paused
+
+// Tracks which seconds we've already beeped for (warning + phase-start)
+let lastWarnSecond = -1;
+let lastPhaseStartBeep = false;
+
+// ===================== RING =====================
+const ring = document.getElementById('progressRing');
+const CIRC = 2 * Math.PI * 121;
+ring.style.strokeDasharray = CIRC;
+ring.style.strokeDashoffset = CIRC;
+
+function setRing(frac, color) {
+  ring.style.strokeDashoffset = CIRC * (1 - Math.max(0, Math.min(1, frac)));
+  ring.style.stroke = color;
+}
+
+// ===================== AUDIO =====================
+const actx = new (window.AudioContext || window.webkitAudioContext)();
+const comp = actx.createDynamicsCompressor();
+comp.threshold.value = -3; comp.knee.value = 2;
+comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.08;
+comp.connect(actx.destination);
+
+function beep(freq, dur, type='sine', vol=1.0) {
+  const osc = actx.createOscillator();
+  const gain = actx.createGain();
+  osc.connect(gain); gain.connect(comp);
+  osc.frequency.value = freq; osc.type = type;
+  gain.gain.setValueAtTime(vol, actx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
+  osc.start(actx.currentTime); osc.stop(actx.currentTime + dur);
+}
+
+function signalWarmup()   { beep(440,.28); setTimeout(()=>beep(550,.28),300); setTimeout(()=>beep(660,.4),600); }
+function signalRun()      { beep(880,.2,'square',.9); setTimeout(()=>beep(1100,.3,'square',.9),220); }
+function signalWalk()     { beep(660,.25); setTimeout(()=>beep(440,.35),260); }
+function signalCooldown() { beep(660,.28); setTimeout(()=>beep(550,.28),300); setTimeout(()=>beep(440,.4),600); }
+function signalDone()     { [0,200,400,620,880].forEach((t,i)=>setTimeout(()=>beep(660+i*110,.32),t)); }
+function signalWarning()  { beep(1400,.08,'square',.85); }
+
+// ===================== WAKE LOCK =====================
+let wakeLock = null;
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    document.getElementById('wakeBadge').textContent = '🟢 schermo sempre attivo';
+    document.getElementById('wakeBadge').className = 'wakelock-badge on';
+    wakeLock.addEventListener('release', () => {
+      document.getElementById('wakeBadge').textContent = '⚫ schermo libero di spegnersi';
+      document.getElementById('wakeBadge').className = 'wakelock-badge';
+    });
+  } catch(e) { /* not supported or denied */ }
+}
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+}
+
+// Re-acquire wake lock if page becomes visible again (e.g. after screen on)
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && running) {
+    await requestWakeLock();
+  }
+});
+
+// ===================== PIPELINE UI =====================
+function updatePipeline() {
+  document.getElementById('pipe-warm').className = 'pipe-item'+(currentPhase==='warmup'  ?' active-warm':'');
+  document.getElementById('pipe-run').className  = 'pipe-item'+(currentPhase==='run'     ?' active-run' :'');
+  document.getElementById('pipe-walk').className = 'pipe-item'+(currentPhase==='walk'    ?' active-walk':'');
+  document.getElementById('pipe-cool').className = 'pipe-item'+(currentPhase==='cooldown'?' active-cool':'');
+}
+
+// ===================== DOTS =====================
+function buildDots() {
+  const grid = document.getElementById('dotsGrid');
+  grid.innerHTML = '';
+  for (let r=0;r<cfg.reps;r++) {
+    ['run','walk'].forEach(t => {
+      const d = document.createElement('div');
+      d.className = 'interval-dot'; d.id = `dot-${t}-${r}`;
+      grid.appendChild(d);
+    });
+  }
+}
+buildDots();
+
+function updateDots() {
+  if (currentPhase==='warmup') {
+    for(let r=0;r<cfg.reps;r++) {
+      document.getElementById(`dot-run-${r}`).className='interval-dot';
+      document.getElementById(`dot-walk-${r}`).className='interval-dot';
+    }
+    return;
+  }
+  for(let r=0;r<cfg.reps;r++) {
+    const dr=document.getElementById(`dot-run-${r}`);
+    const dw=document.getElementById(`dot-walk-${r}`);
+    if (r < currentRep) {
+      dr.className='interval-dot done-run'; dw.className='interval-dot done-walk';
+    } else if (r===currentRep && (currentPhase==='run'||currentPhase==='walk')) {
+      dr.className='interval-dot done-run'+(currentPhase==='run'?' active':'');
+      dw.className='interval-dot'+(currentPhase==='walk'?' done-walk active':'');
+    } else {
+      dr.className='interval-dot'; dw.className='interval-dot';
+    }
+  }
+}
+
+// ===================== HELPERS =====================
+function phaseColor(p) { return {warmup:'#f0b429',run:'#ff4d1c',walk:'#1caaff',cooldown:'#44dd88'}[p]||'#f0f0f0'; }
+function phaseLabel(p) { return {warmup:'🔥 RISCALDAMENTO',run:'🏃 CORSA',walk:'🚶 CAMMINATA',cooldown:'❄️ DEFATICAMENTO'}[p]||''; }
+function phaseDur(p)   { return {warmup:cfg.warm,run:cfg.run,walk:cfg.walk,cooldown:cfg.cool}[p]*1000; }
+function formatTime(ms) {
+  const s = Math.ceil(ms/1000);
+  if (s >= 60) return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  return String(Math.max(0,s));
+}
+
+// ===================== PHASE TRANSITION =====================
+function startPhase(phase, rep=0) {
+  currentPhase = phase; currentRep = rep;
+  phaseDuration = phaseDur(phase);
+  phaseStartTime = Date.now();
+  lastWarnSecond = -1;
+  lastPhaseStartBeep = false;
+  if (phase==='warmup')   signalWarmup();
+  else if (phase==='run') signalRun();
+  else if (phase==='walk') signalWalk();
+  else signalCooldown();
+  lastPhaseStartBeep = true;
+  updatePipeline(); updateDots();
+}
+
+function advancePhase() {
+  if (currentPhase==='warmup')        startPhase('run', 0);
+  else if (currentPhase==='run')      startPhase('walk', currentRep);
+  else if (currentPhase==='walk') {
+    const next = currentRep+1;
+    if (next >= cfg.reps) { cfg.cool>0 ? startPhase('cooldown') : finish(); }
+    else startPhase('run', next);
+  } else finish();
+}
+
+// ===================== MAIN LOOP (rAF-based) =====================
+function loop() {
+  if (!running) return;
+
+  const now = Date.now();
+  const elapsed = now - phaseStartTime;
+  const remaining = phaseDuration - elapsed;
+
+  // Phase over?
+  if (remaining <= 0) {
+    advancePhase();
+    if (running) rafId = requestAnimationFrame(loop);
+    return;
+  }
+
+  // Warning beeps at 3, 2, 1 seconds remaining
+  const secLeft = Math.ceil(remaining / 1000);
+  if (secLeft <= 3 && secLeft > 0 && secLeft !== lastWarnSecond) {
+    lastWarnSecond = secLeft;
+    signalWarning();
+  }
+
+  // Update display
+  const color = phaseColor(currentPhase);
+  const frac = remaining / phaseDuration;
+  setRing(frac, color);
+  document.getElementById('phaseLabel').textContent = phaseLabel(currentPhase);
+  document.getElementById('phaseLabel').style.color = color;
+  document.getElementById('timeDisplay').textContent = formatTime(remaining);
+  document.getElementById('timeDisplay').style.color = color;
+  const isInterval = currentPhase==='run'||currentPhase==='walk';
+  document.getElementById('intervalCount').textContent = isInterval
+    ? `intervallo ${currentRep+1} / ${cfg.reps}`
+    : (currentPhase==='warmup'?'riscaldamento':'defaticamento');
+
+  rafId = requestAnimationFrame(loop);
+}
+
+// ===================== FINISH =====================
+function finish() {
+  running = false;
+  cancelAnimationFrame(rafId);
+  releaseWakeLock();
+  document.getElementById('startBtn').textContent = 'INIZIA';
+  document.getElementById('phaseLabel').textContent = '✓ COMPLETATO';
+  document.getElementById('phaseLabel').style.color = '#44dd88';
+  document.getElementById('timeDisplay').textContent = '🎉';
+  document.getElementById('timeDisplay').style.color = '#f0f0f0';
+  document.getElementById('intervalCount').textContent = `${cfg.reps} intervalli completati`;
+  setRing(1,'#44dd88');
+  for(let r=0;r<cfg.reps;r++){
+    document.getElementById(`dot-run-${r}`).className='interval-dot done-run';
+    document.getElementById(`dot-walk-${r}`).className='interval-dot done-walk';
+  }
+  document.getElementById('doneMsg').style.display='block';
+  signalDone();
+}
+
+// ===================== TOGGLE START/PAUSE =====================
+async function toggleStart() {
+  if (actx.state==='suspended') await actx.resume();
+  if (!running) {
+    running = true;
+    document.getElementById('startBtn').textContent = 'PAUSA';
+    document.getElementById('doneMsg').style.display = 'none';
+    await requestWakeLock();
+
+    if (pausedRemaining > 0) {
+      // Resume from pause: recalculate phaseStartTime
+      phaseStartTime = Date.now() - (phaseDuration - pausedRemaining);
+      pausedRemaining = 0;
+    } else {
+      // Fresh start
+      buildDots();
+      cfg.warm > 0 ? startPhase('warmup') : startPhase('run', 0);
+    }
+    rafId = requestAnimationFrame(loop);
+  } else {
+    // Pause
+    running = false;
+    cancelAnimationFrame(rafId);
+    releaseWakeLock();
+    pausedRemaining = phaseDuration - (Date.now() - phaseStartTime);
+    document.getElementById('startBtn').textContent = 'RIPRENDI';
+  }
+}
+
+// ===================== RESET =====================
+function resetAll() {
+  running = false;
+  cancelAnimationFrame(rafId);
+  releaseWakeLock();
+  pausedRemaining = 0; phaseDuration = 0;
+  currentPhase='warmup'; currentRep=0;
+  document.getElementById('startBtn').textContent = 'INIZIA';
+  document.getElementById('phaseLabel').textContent = 'PRONTO';
+  document.getElementById('phaseLabel').style.color = '#f0f0f0';
+  document.getElementById('timeDisplay').textContent = '—';
+  document.getElementById('timeDisplay').style.color = '#f0f0f0';
+  document.getElementById('intervalCount').textContent = '— / —';
+  document.getElementById('doneMsg').style.display = 'none';
+  ring.style.strokeDashoffset = CIRC; ring.style.stroke = '#333';
+  ['warm','run','walk','cool'].forEach(k=>document.getElementById('pipe-'+k).className='pipe-item');
+  document.getElementById('wakeBadge').textContent = '⚫ schermo libero di spegnersi';
+  document.getElementById('wakeBadge').className = 'wakelock-badge';
+  buildDots();
+}
+</script>
+</body>
+</html>
