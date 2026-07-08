@@ -324,7 +324,7 @@
     <div class="metrics">
       <div class="metric"><div class="val" id="mPaceInt">—</div><div class="lbl">Passo intervallo</div></div>
       <div class="metric"><div class="val" id="mPaceTot">—</div><div class="lbl">Passo totale</div></div>
-      <div class="metric"><div class="val" id="mSteps">0</div><div class="lbl">Passi est.</div></div>
+      <div class="metric"><div class="val" id="mCad">—</div><div class="lbl">Cadenza (spm)</div></div>
     </div>
     <div id="gpsStatus">GPS: in attesa…</div>
     <div id="nextInfo"></div>
@@ -344,6 +344,7 @@
     <div class="sumitem"><div class="val" id="sSteps">—</div><div class="lbl">Passi stimati</div></div>
     <div class="sumitem"><div class="val" id="sPaceRun">—</div><div class="lbl">Passo corsa</div></div>
     <div class="sumitem"><div class="val" id="sPaceTot">—</div><div class="lbl">Passo totale</div></div>
+    <div class="sumitem wide"><div class="val" id="sCadRun">—</div><div class="lbl">Cadenza media corsa (spm)</div></div>
   </div>
   <button id="btnNew">Nuova sessione</button>
 </div>
@@ -449,6 +450,13 @@ function paceSpoken(meters, seconds) {
   if (secPerKm > 30 * 60) return null;
   const m = Math.floor(secPerKm / 60), s = Math.round(secPerKm % 60);
   return m + ' minuti e ' + s + ' secondi al chilometro';
+}
+function cadence(meters, type, seconds) {
+  // passi al minuto stimati (spm) per il segmento
+  if (meters < 30 || seconds < 20) return null;
+  const stride = type === 'corsa' ? strideRun : strideWalk;
+  const spm = Math.round((meters / stride) / (seconds / 60));
+  return (spm > 20 && spm < 300) ? spm : null;
 }
 
 /* ==================== GPS ==================== */
@@ -625,8 +633,8 @@ function endSegment() {
     let msg = 'Fine ' + seg.type + '.';
     const p = paceSpoken(distInterval, seg.dur);
     if (p) msg += ' Passo: ' + p + '.';
-    const stepInt = Math.round(distInterval / (seg.type === 'corsa' ? strideRun : strideWalk));
-    if (stepInt > 0) msg += ' Passi stimati: ' + stepInt + '.';
+    const cadInt = cadence(distInterval, seg.type, seg.dur);
+    if (cadInt) msg += ' Cadenza: ' + cadInt + ' passi al minuto.';
     const pt = paceSpoken(distTotal, timeMoving);
     if (pt) msg += ' Passo totale: ' + pt + '.';
     say(msg);
@@ -656,7 +664,8 @@ function render() {
   $('progressBar').style.width = pct + '%';
   $('mPaceInt').textContent = paceStr(distInterval, seg ? seg.dur - remaining : 0);
   $('mPaceTot').textContent = paceStr(distTotal, timeMoving);
-  $('mSteps').textContent = Math.round(steps);
+  const cad = seg ? cadence(distInterval, seg.type, seg.dur - remaining) : null;
+  $('mCad').textContent = cad ? cad : '—';
 }
 
 function finishSession() {
@@ -671,6 +680,8 @@ function finishSession() {
   $('sSteps').textContent = Math.round(steps);
   $('sPaceRun').textContent = paceStr(distRun, timeRun);
   $('sPaceTot').textContent = paceStr(distTotal, timeMoving);
+  const cr = cadence(distRun, 'corsa', timeRun);
+  $('sCadRun').textContent = cr ? cr : '—';
 
   $('session').classList.remove('active');
   $('summary').classList.add('active');
