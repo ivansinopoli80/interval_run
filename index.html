@@ -2,588 +2,738 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Interval Trainer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#ff5a3c">
+<title>Interval Run Trainer</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap');
 
   :root {
-    --run: #ff4d1c;
-    --walk: #1caaff;
-    --warm: #f0b429;
-    --cool: #44dd88;
-    --bg: #0a0a0f;
-    --surface: #13131a;
-    --text: #f0f0f0;
-    --muted: #555;
+    --bg: #0a0e14;
+    --surface: #131a24;
+    --border: #1f2937;
+    --text: #f2f4f8;
+    --muted: #6b7688;
+    --warmup: #f5a623;   /* riscaldamento / defaticamento */
+    --run: #ff5a3c;      /* corsa */
+    --walk: #2ecc71;     /* camminata */
     --radius: 16px;
   }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  html, body { height: 100%; }
 
   body {
     font-family: 'Space Mono', monospace;
     background: var(--bg);
     color: var(--text);
-    min-height: 100vh;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-    gap: 20px;
+    min-height: 100vh;
+    min-height: 100dvh;
+    transition: background 0.25s;
   }
+
+  body.flash { background: #3a2415; }
 
   h1 {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: clamp(2rem, 6vw, 3.5rem);
-    letter-spacing: 0.12em;
-    color: var(--text);
+    font-size: clamp(2rem, 8vw, 3rem);
+    letter-spacing: 0.14em;
     text-align: center;
+    padding: 20px 16px 4px;
+  }
+  h1 span { color: var(--run); }
+
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    margin-bottom: 16px;
   }
 
-  .config {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 12px;
-    width: 100%;
-    max-width: 660px;
-    background: var(--surface);
-    border-radius: var(--radius);
-    padding: 20px 16px;
-    border: 1px solid #222;
-  }
-
-  .config-item {
+  /* ============ SETUP ============ */
+  #setup {
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    padding: 0 16px 28px;
+    gap: 14px;
+    max-width: 520px;
+    margin: 0 auto;
+    width: 100%;
   }
 
-  .config-item label {
-    font-size: 0.58rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    text-align: center;
-    line-height: 1.3;
-  }
-
-  .config-item .value {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 2rem;
-    line-height: 1;
-  }
-
-  .btn-row { display: flex; gap: 6px; }
-
-  .btn-sm {
-    background: #222;
-    border: none;
-    color: var(--text);
-    font-family: 'Space Mono', monospace;
-    font-size: 0.9rem;
-    width: 30px; height: 30px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  .btn-sm:hover { background: #333; }
-
-  /* PIPELINE */
-  .pipeline {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 0.82rem;
-    letter-spacing: 0.1em;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .pipe-item {
-    padding: 4px 10px;
-    border-radius: 20px;
-    background: #1a1a24;
-    color: var(--muted);
-    transition: background 0.3s, color 0.3s;
-    white-space: nowrap;
-  }
-
-  .pipe-item.active-warm { background: var(--warm); color: #000; }
-  .pipe-item.active-run  { background: var(--run);  color: #fff; }
-  .pipe-item.active-walk { background: var(--walk); color: #fff; }
-  .pipe-item.active-cool { background: var(--cool); color: #000; }
-  .pipe-sep { color: #333; }
-
-  /* TIMER */
-  .timer-wrap {
-    position: relative;
-    width: 270px; height: 270px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  svg.ring {
-    position: absolute; top: 0; left: 0;
-    width: 100%; height: 100%;
-    transform: rotate(-90deg);
-  }
-
-  .track { fill: none; stroke: #1a1a24; stroke-width: 14; }
-
-  .progress-ring {
-    fill: none;
-    stroke-width: 14;
-    stroke-linecap: round;
-    /* NO CSS transition — we update every frame so it's always smooth */
-  }
-
-  .timer-inner { text-align: center; z-index: 1; }
-
-  .phase-label {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.3rem;
-    letter-spacing: 0.2em;
-    transition: color 0.4s;
-  }
-
-  .time-display {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 4.5rem;
-    line-height: 1;
-    transition: color 0.4s;
-  }
-
-  .interval-count {
-    font-size: 0.65rem;
-    color: var(--muted);
-    letter-spacing: 0.1em;
-  }
-
-  /* CONTROLS */
-  .controls { display: flex; gap: 16px; }
-
-  .btn-main {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.3rem;
-    letter-spacing: 0.15em;
-    padding: 14px 36px;
-    border: none;
+  .group {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: var(--radius);
-    cursor: pointer;
-    transition: transform 0.1s;
-  }
-  .btn-main:active { transform: scale(0.96); }
-  .btn-start { background: var(--run); color: #fff; }
-  .btn-reset { background: #1a1a24; color: var(--muted); border: 1px solid #333; }
-  .btn-reset:hover { color: var(--text); border-color: #555; }
-
-  /* DOTS */
-  .intervals-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    justify-content: center;
-    max-width: 560px;
-    padding: 0 8px;
+    padding: 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
   }
 
-  .interval-dot {
-    width: 24px; height: 7px;
-    border-radius: 4px;
-    background: #1a1a24;
-    transition: background 0.3s;
-  }
-  .interval-dot.done-run  { background: var(--run); }
-  .interval-dot.done-walk { background: var(--walk); }
-  .interval-dot.active { animation: pulse 0.8s infinite alternate; }
+  .group .full { grid-column: 1 / -1; }
 
-  @keyframes pulse { from { opacity: 0.5; } to { opacity: 1; } }
+  .field { display: flex; flex-direction: column; gap: 6px; }
 
-  .done-msg {
-    display: none;
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 2rem;
-    letter-spacing: 0.15em;
-    color: var(--cool);
-    text-align: center;
-    animation: fadeIn 0.5s;
-  }
-
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } }
-
-  /* wake lock indicator */
-  .wakelock-badge {
-    font-size: 0.6rem;
-    letter-spacing: 0.08em;
+  .field label {
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
     color: var(--muted);
+  }
+
+  .field input {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    width: 100%;
     text-align: center;
   }
-  .wakelock-badge.on { color: var(--cool); }
+  .field input:focus { outline: 2px solid var(--run); border-color: transparent; }
 
-  @media (max-width: 500px) {
-    .config { grid-template-columns: repeat(3, 1fr); }
-    .timer-wrap { width: 220px; height: 220px; }
-    .time-display { font-size: 3.5rem; }
-    .config-item .value { font-size: 1.6rem; }
+  .legend {
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    width: 100%;
+    padding-left: 4px;
+    margin-top: 4px;
+  }
+  .legend b { color: var(--text); }
+
+  button {
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+  }
+
+  #btnTestVoice {
+    width: 100%;
+    padding: 14px;
+    font-size: 0.95rem;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  #btnTestVoice.ok { border-color: var(--walk); color: var(--walk); }
+
+  #btnStart {
+    width: 100%;
+    padding: 18px;
+    font-size: 1.15rem;
+    letter-spacing: 0.06em;
+    background: var(--run);
+    color: #fff;
+  }
+  #btnStart:active { transform: scale(0.98); }
+
+  .hint { font-size: 0.68rem; color: var(--muted); text-align: center; line-height: 1.5; }
+
+  /* ============ SESSIONE ============ */
+  #session { display: none; flex: 1; flex-direction: column; }
+  #session.active { display: flex; }
+
+  #progressBar {
+    height: 8px;
+    width: 0%;
+    background: var(--warmup);
+    transition: width 0.5s linear, background 0.4s;
+  }
+
+  .topline {
+    display: flex;
+    justify-content: space-between;
+    padding: 16px 20px 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 16px;
+  }
+
+  #phaseLabel {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(1.4rem, 6vw, 2.2rem);
+    letter-spacing: 0.35em;
+    color: var(--warmup);
+  }
+
+  #timer {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(6rem, 32vw, 11rem);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: 100%;
+    max-width: 460px;
+    margin-top: 10px;
+  }
+  .metric { text-align: center; }
+  .metric .val { font-size: 1.5rem; font-weight: 700; }
+  .metric .lbl {
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  #gpsStatus {
+    margin-top: 10px;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  #gpsStatus.ok { color: var(--walk); }
+  #gpsStatus.err { color: #ff4d4d; font-weight: 700; }
+
+  #nextInfo { margin-top: 8px; font-size: 1rem; color: var(--muted); }
+  #nextInfo b { color: var(--text); }
+
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    padding: 0 16px 28px;
+    max-width: 520px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  .controls button {
+    padding: 20px;
+    font-size: 1.1rem;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  #btnStop.confirm { background: #ff4d4d; border-color: #ff4d4d; color: #fff; }
+  #btnPause.paused { background: var(--walk); border-color: var(--walk); color: #06130b; }
+
+  /* ============ RIEPILOGO ============ */
+  #summary {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 16px 28px;
+    gap: 14px;
+    max-width: 520px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  #summary.active { display: flex; }
+
+  .sumgrid {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px 10px;
+  }
+  .sumitem { text-align: center; }
+  .sumitem .val { font-family: 'Bebas Neue', sans-serif; font-size: 2.4rem; }
+  .sumitem .lbl {
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .sumitem.wide { grid-column: 1 / -1; }
+  .sumitem.wide .val { color: var(--run); }
+
+  #btnNew {
+    width: 100%;
+    padding: 18px;
+    font-size: 1.1rem;
+    background: var(--run);
+    color: #fff;
   }
 </style>
 </head>
 <body>
 
-<h1>Interval Trainer</h1>
+<h1>INTERVAL <span>RUN</span> TRAINER</h1>
+<div class="subtitle">VOCE ITALIANA · GPS · STIMA PASSI</div>
 
-<div class="config" id="configPanel">
-  <div class="config-item">
-    <label style="color:var(--warm)">🔥 Warm-up (sec)</label>
-    <div class="value" style="color:var(--warm)" id="warmVal">120</div>
-    <div class="btn-row">
-      <button class="btn-sm" onclick="adjust('warm',-15)">−</button>
-      <button class="btn-sm" onclick="adjust('warm',15)">+</button>
-    </div>
+<!-- ================= SETUP ================= -->
+<div id="setup">
+  <div class="legend">Struttura sessione</div>
+  <div class="group">
+    <div class="field"><label>Riscaldamento (min)</label><input id="inWarm" type="number" inputmode="numeric" min="0" value="3"></div>
+    <div class="field"><label>Ripetizioni</label><input id="inReps" type="number" inputmode="numeric" min="1" value="4"></div>
+    <div class="field"><label>Corsa (min)</label><input id="inRun" type="number" inputmode="decimal" min="0.5" step="0.5" value="3"></div>
+    <div class="field"><label>Camminata (min)</label><input id="inWalk" type="number" inputmode="decimal" min="0.5" step="0.5" value="2"></div>
+    <div class="field full"><label>Defaticamento (min)</label><input id="inCool" type="number" inputmode="numeric" min="0" value="3"></div>
   </div>
-  <div class="config-item">
-    <label style="color:var(--run)">🏃 Corsa (sec)</label>
-    <div class="value" style="color:var(--run)" id="runVal">60</div>
-    <div class="btn-row">
-      <button class="btn-sm" onclick="adjust('run',-5)">−</button>
-      <button class="btn-sm" onclick="adjust('run',5)">+</button>
-    </div>
+
+  <div class="legend">Lunghezza passo (per stima passi)</div>
+  <div class="group">
+    <div class="field"><label>Corsa (m)</label><input id="inStrideRun" type="number" inputmode="decimal" step="0.01" value="1.20"></div>
+    <div class="field"><label>Camminata (m)</label><input id="inStrideWalk" type="number" inputmode="decimal" step="0.01" value="0.76"></div>
   </div>
-  <div class="config-item">
-    <label>🔁 Ripetizioni</label>
-    <div class="value" id="repsVal">8</div>
-    <div class="btn-row">
-      <button class="btn-sm" onclick="adjust('reps',-1)">−</button>
-      <button class="btn-sm" onclick="adjust('reps',1)">+</button>
-    </div>
+
+  <button id="btnTestVoice">🔊 Test voce (tocca prima di avviare)</button>
+  <button id="btnStart">▶ AVVIA SESSIONE</button>
+  <div class="hint">Su Android tocca prima "Test voce" per sbloccare l'audio.<br>Il GPS richiede il permesso posizione all'avvio.</div>
+</div>
+
+<!-- ================= SESSIONE ================= -->
+<div id="session">
+  <div id="progressBar"></div>
+  <div class="topline">
+    <span id="phaseTop">—</span>
+    <span id="repTop"></span>
+    <span id="elapsedTop">0:00</span>
   </div>
-  <div class="config-item">
-    <label style="color:var(--walk)">🚶 Camminata (sec)</label>
-    <div class="value" style="color:var(--walk)" id="walkVal">30</div>
-    <div class="btn-row">
-      <button class="btn-sm" onclick="adjust('walk',-5)">−</button>
-      <button class="btn-sm" onclick="adjust('walk',5)">+</button>
+  <div class="center">
+    <div id="phaseLabel">RISCALDAMENTO</div>
+    <div id="timer">0:00</div>
+    <div class="metrics">
+      <div class="metric"><div class="val" id="mPaceInt">—</div><div class="lbl">Passo intervallo</div></div>
+      <div class="metric"><div class="val" id="mPaceTot">—</div><div class="lbl">Passo totale</div></div>
+      <div class="metric"><div class="val" id="mSteps">0</div><div class="lbl">Passi est.</div></div>
     </div>
+    <div id="gpsStatus">GPS: in attesa…</div>
+    <div id="nextInfo"></div>
   </div>
-  <div class="config-item">
-    <label style="color:var(--cool)">❄️ Cool-down (sec)</label>
-    <div class="value" style="color:var(--cool)" id="coolVal">180</div>
-    <div class="btn-row">
-      <button class="btn-sm" onclick="adjust('cool',-15)">−</button>
-      <button class="btn-sm" onclick="adjust('cool',15)">+</button>
-    </div>
+  <div class="controls">
+    <button id="btnPause">Pausa</button>
+    <button id="btnStop">Termina</button>
   </div>
 </div>
 
-<!-- PIPELINE -->
-<div class="pipeline">
-  <div class="pipe-item" id="pipe-warm">🔥 WARM-UP</div>
-  <span class="pipe-sep">›</span>
-  <div class="pipe-item" id="pipe-run">🏃 CORSA</div>
-  <span class="pipe-sep">/</span>
-  <div class="pipe-item" id="pipe-walk">🚶 CAMMINATA</div>
-  <span class="pipe-sep">›</span>
-  <div class="pipe-item" id="pipe-cool">❄️ COOL-DOWN</div>
-</div>
-
-<!-- TIMER -->
-<div class="timer-wrap">
-  <svg class="ring" viewBox="0 0 270 270">
-    <circle class="track" cx="135" cy="135" r="121"/>
-    <circle class="progress-ring" id="progressRing" cx="135" cy="135" r="121"/>
-  </svg>
-  <div class="timer-inner">
-    <div class="phase-label" id="phaseLabel">PRONTO</div>
-    <div class="time-display" id="timeDisplay">—</div>
-    <div class="interval-count" id="intervalCount">— / —</div>
+<!-- ================= RIEPILOGO ================= -->
+<div id="summary">
+  <div class="legend">Sessione completata 🎉</div>
+  <div class="sumgrid">
+    <div class="sumitem wide"><div class="val" id="sTime">—</div><div class="lbl">Tempo totale</div></div>
+    <div class="sumitem"><div class="val" id="sDist">—</div><div class="lbl">Distanza (km)</div></div>
+    <div class="sumitem"><div class="val" id="sSteps">—</div><div class="lbl">Passi stimati</div></div>
+    <div class="sumitem"><div class="val" id="sPaceRun">—</div><div class="lbl">Passo corsa</div></div>
+    <div class="sumitem"><div class="val" id="sPaceTot">—</div><div class="lbl">Passo totale</div></div>
   </div>
+  <button id="btnNew">Nuova sessione</button>
 </div>
-
-<div class="done-msg" id="doneMsg">✓ Allenamento completato!</div>
-
-<div class="controls">
-  <button class="btn-main btn-start" id="startBtn" onclick="toggleStart()">INIZIA</button>
-  <button class="btn-main btn-reset" onclick="resetAll()">RESET</button>
-</div>
-
-<div class="intervals-grid" id="dotsGrid"></div>
-<div class="wakelock-badge" id="wakeBadge">⚫ schermo libero di spegnersi</div>
 
 <script>
-// ===================== CONFIG =====================
-const cfg = { warm: 120, run: 60, walk: 30, reps: 8, cool: 180 };
-const limits = { warm:[0,600], run:[5,300], walk:[5,300], reps:[1,30], cool:[0,600] };
+'use strict';
 
-function adjust(key, delta) {
-  if (running) return;
-  cfg[key] = Math.min(limits[key][1], Math.max(limits[key][0], cfg[key] + delta));
-  document.getElementById(key+'Val').textContent = cfg[key];
-  buildDots();
-}
+/* ==================== STATO ==================== */
+const $ = id => document.getElementById(id);
 
-// ===================== STATE =====================
+const COLORS = { riscaldamento: 'var(--warmup)', corsa: 'var(--run)', camminata: 'var(--walk)', defaticamento: 'var(--warmup)' };
+const NAMES  = { riscaldamento: 'RISCALDAMENTO', corsa: 'CORSA', camminata: 'CAMMINATA', defaticamento: 'DEFATICAMENTO' };
+
+let segments = [];        // [{type, dur(sec), rep}]
+let segIndex = 0;
+let remaining = 0;        // secondi rimanenti nel segmento
+let elapsedTotal = 0;     // secondi totali sessione
+let interval = null;
 let running = false;
-let rafId = null;
-let currentPhase = 'warmup'; // warmup | run | walk | cooldown
-let currentRep = 0;
-let phaseStartTime = 0;   // Date.now() when current phase started
-let phaseDuration = 0;    // total ms for current phase
-let pausedAt = 0;         // Date.now() when paused
-let pausedRemaining = 0;  // ms remaining when paused
-
-// Tracks which seconds we've already beeped for (warning + phase-start)
-let lastWarnSecond = -1;
-let lastPhaseStartBeep = false;
-
-// ===================== RING =====================
-const ring = document.getElementById('progressRing');
-const CIRC = 2 * Math.PI * 121;
-ring.style.strokeDasharray = CIRC;
-ring.style.strokeDashoffset = CIRC;
-
-function setRing(frac, color) {
-  ring.style.strokeDashoffset = CIRC * (1 - Math.max(0, Math.min(1, frac)));
-  ring.style.stroke = color;
-}
-
-// ===================== AUDIO =====================
-const actx = new (window.AudioContext || window.webkitAudioContext)();
-const comp = actx.createDynamicsCompressor();
-comp.threshold.value = -3; comp.knee.value = 2;
-comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.08;
-comp.connect(actx.destination);
-
-function beep(freq, dur, type='sine', vol=1.0) {
-  const osc = actx.createOscillator();
-  const gain = actx.createGain();
-  osc.connect(gain); gain.connect(comp);
-  osc.frequency.value = freq; osc.type = type;
-  gain.gain.setValueAtTime(vol, actx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
-  osc.start(actx.currentTime); osc.stop(actx.currentTime + dur);
-}
-
-function signalWarmup()   { beep(440,.28); setTimeout(()=>beep(550,.28),300); setTimeout(()=>beep(660,.4),600); }
-function signalRun()      { beep(880,.2,'square',.9); setTimeout(()=>beep(1100,.3,'square',.9),220); }
-function signalWalk()     { beep(660,.25); setTimeout(()=>beep(440,.35),260); }
-function signalCooldown() { beep(660,.28); setTimeout(()=>beep(550,.28),300); setTimeout(()=>beep(440,.4),600); }
-function signalDone()     { [0,200,400,620,880].forEach((t,i)=>setTimeout(()=>beep(660+i*110,.32),t)); }
-function signalWarning()  { beep(1400,.08,'square',.85); }
-
-// ===================== WAKE LOCK =====================
+let paused = false;
+let transitioning = false;   // blocca il tick durante le transizioni (fix salti intervalli)
+let warned15 = false;
+let stopArmed = false;
+let stopTimer = null;
 let wakeLock = null;
-async function requestWakeLock() {
-  if (!('wakeLock' in navigator)) return;
-  try {
-    wakeLock = await navigator.wakeLock.request('screen');
-    document.getElementById('wakeBadge').textContent = '🟢 schermo sempre attivo';
-    document.getElementById('wakeBadge').className = 'wakelock-badge on';
-    wakeLock.addEventListener('release', () => {
-      document.getElementById('wakeBadge').textContent = '⚫ schermo libero di spegnersi';
-      document.getElementById('wakeBadge').className = 'wakelock-badge';
-    });
-  } catch(e) { /* not supported or denied */ }
+
+/* GPS */
+let watchId = null;
+let lastPos = null;
+let distTotal = 0;        // metri totali (fasi in movimento)
+let distInterval = 0;     // metri nell'intervallo corrente
+let distRun = 0;          // metri solo corsa
+let timeRun = 0;          // secondi solo corsa
+let timeMoving = 0;       // secondi con GPS attivo (tutte le fasi)
+let steps = 0;            // passi stimati totali
+let strideRun = 1.20, strideWalk = 0.76;
+
+/* Voce: coda ordinata, niente sovrapposizioni */
+const voiceQueue = [];
+let speaking = false;
+let itVoice = null;
+
+function pickVoice() {
+  const vs = speechSynthesis.getVoices();
+  itVoice = vs.find(v => v.lang && v.lang.toLowerCase().startsWith('it')) || null;
 }
-function releaseWakeLock() {
-  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+if ('speechSynthesis' in window) {
+  pickVoice();
+  speechSynthesis.onvoiceschanged = pickVoice;
 }
 
-// Re-acquire wake lock if page becomes visible again (e.g. after screen on)
-document.addEventListener('visibilitychange', async () => {
-  if (document.visibilityState === 'visible' && running) {
-    await requestWakeLock();
+function say(text) {
+  voiceQueue.push(text);
+  processQueue();
+}
+function processQueue() {
+  if (speaking || voiceQueue.length === 0 || !('speechSynthesis' in window)) return;
+  speaking = true;
+  const u = new SpeechSynthesisUtterance(voiceQueue.shift());
+  u.lang = 'it-IT';
+  if (itVoice) u.voice = itVoice;
+  u.rate = 1.0;
+  u.onend = u.onerror = () => { speaking = false; setTimeout(processQueue, 120); };
+  speechSynthesis.speak(u);
+}
+
+/* Beep (Web Audio) */
+let audioCtx = null;
+function beep(freq = 880, ms = 150) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.frequency.value = freq;
+    o.connect(g); g.connect(audioCtx.destination);
+    g.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + ms / 1000);
+    o.start(); o.stop(audioCtx.currentTime + ms / 1000);
+  } catch (e) { /* ignora */ }
+}
+
+/* ==================== UTILS ==================== */
+const fmtTime = s => {
+  s = Math.max(0, Math.round(s));
+  const m = Math.floor(s / 60), sec = s % 60;
+  return m + ':' + String(sec).padStart(2, '0');
+};
+const fmtLong = s => {
+  const h = Math.floor(s / 3600);
+  return h > 0 ? h + ':' + String(Math.floor((s % 3600) / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0') : fmtTime(s);
+};
+function paceStr(meters, seconds) {
+  if (meters < 30 || seconds < 20) return '—';           // dati insufficienti
+  const secPerKm = seconds / (meters / 1000);
+  if (secPerKm > 30 * 60) return '—';                    // troppo lento = fermo
+  const m = Math.floor(secPerKm / 60), s = Math.round(secPerKm % 60);
+  return m + "'" + String(s).padStart(2, '0') + '"';
+}
+function paceSpoken(meters, seconds) {
+  if (meters < 30 || seconds < 20) return null;
+  const secPerKm = seconds / (meters / 1000);
+  if (secPerKm > 30 * 60) return null;
+  const m = Math.floor(secPerKm / 60), s = Math.round(secPerKm % 60);
+  return m + ' minuti e ' + s + ' secondi al chilometro';
+}
+
+/* ==================== GPS ==================== */
+function startGPS() {
+  if (!('geolocation' in navigator)) {
+    setGps('err', 'GPS: non disponibile');
+    return;
+  }
+  setGps('', 'GPS: in attesa…');
+  watchId = navigator.geolocation.watchPosition(onPos, onGpsErr, {
+    enableHighAccuracy: true, maximumAge: 1000, timeout: 15000
+  });
+}
+function stopGPS() {
+  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+}
+function setGps(cls, txt) {
+  const el = $('gpsStatus');
+  el.className = cls;
+  el.textContent = cls === 'err' ? '⚠️ ' + txt : txt;
+}
+function haversine(a, b) {
+  const R = 6371000, rad = x => x * Math.PI / 180;
+  const dLat = rad(b.latitude - a.latitude);
+  const dLon = rad(b.longitude - a.longitude);
+  const h = Math.sin(dLat / 2) ** 2 +
+            Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function onPos(pos) {
+  setGps('ok', 'GPS: segnale OK');
+  const c = pos.coords;
+  if (c.accuracy > 40) return;                 // campione troppo impreciso
+  if (!running || paused || transitioning) { lastPos = c; return; }
+  if (lastPos) {
+    const d = haversine(lastPos, c);
+    if (d < 30) {                              // filtro salti GPS assurdi (>30m)
+      distTotal += d;
+      distInterval += d;
+      const seg = segments[segIndex];
+      if (seg) {
+        if (seg.type === 'corsa') { distRun += d; steps += d / strideRun; }
+        else                      { steps += d / strideWalk; }
+      }
+    }
+  }
+  lastPos = c;
+}
+function onGpsErr(err) {
+  if (err.code === 1) setGps('err', 'GPS: permesso negato');
+  else if (err.code === 3) setGps('', 'GPS: in attesa…');
+  else setGps('err', 'GPS: errore segnale');
+}
+
+/* Wake Lock: schermo acceso durante la sessione */
+async function acquireWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+    }
+  } catch (e) { /* non critico */ }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && running) acquireWakeLock();
+});
+
+/* ==================== SESSIONE ==================== */
+function buildSegments() {
+  const warm = parseFloat($('inWarm').value) || 0;
+  const reps = Math.max(1, parseInt($('inReps').value) || 1);
+  const run  = parseFloat($('inRun').value)  || 3;
+  const walk = parseFloat($('inWalk').value) || 2;
+  const cool = parseFloat($('inCool').value) || 0;
+
+  segments = [];
+  if (warm > 0) segments.push({ type: 'riscaldamento', dur: Math.round(warm * 60) });
+  for (let i = 1; i <= reps; i++) {
+    segments.push({ type: 'corsa', dur: Math.round(run * 60), rep: i, reps });
+    segments.push({ type: 'camminata', dur: Math.round(walk * 60), rep: i, reps });
+  }
+  if (cool > 0) segments.push({ type: 'defaticamento', dur: Math.round(cool * 60) });
+}
+
+function startSession() {
+  strideRun  = parseFloat($('inStrideRun').value)  || 1.20;
+  strideWalk = parseFloat($('inStrideWalk').value) || 0.76;
+  buildSegments();
+
+  // salva impostazioni
+  try {
+    localStorage.setItem('irt-settings', JSON.stringify({
+      w: $('inWarm').value, r: $('inReps').value, c: $('inRun').value,
+      k: $('inWalk').value, d: $('inCool').value, sr: $('inStrideRun').value, sw: $('inStrideWalk').value
+    }));
+  } catch (e) {}
+
+  segIndex = 0; elapsedTotal = 0;
+  distTotal = distInterval = distRun = 0;
+  timeRun = timeMoving = 0; steps = 0;
+  lastPos = null; paused = false; transitioning = false; running = true;
+
+  $('setup').style.display = 'none';
+  $('summary').classList.remove('active');
+  $('session').classList.add('active');
+
+  startGPS();
+  acquireWakeLock();
+  say('Sessione avviata');
+  enterSegment(0, false);
+  interval = setInterval(tick, 1000);
+}
+
+function enterSegment(i, announce = true) {
+  segIndex = i;
+  const seg = segments[i];
+  remaining = seg.dur;
+  distInterval = 0;
+  warned15 = false;
+
+  const color = COLORS[seg.type];
+  $('phaseLabel').textContent = NAMES[seg.type];
+  $('phaseLabel').style.color = color;
+  $('progressBar').style.background = color;
+  $('phaseTop').textContent = NAMES[seg.type].charAt(0) + NAMES[seg.type].slice(1).toLowerCase();
+  $('repTop').textContent = seg.rep ? 'Rip. ' + seg.rep + '/' + seg.reps : '';
+  updateNext();
+
+  if (announce) say('Inizio ' + seg.type);
+  else say('Inizio ' + seg.type);   // annuncio anche il primo segmento
+  render();
+}
+
+function updateNext() {
+  const next = segments[segIndex + 1];
+  $('nextInfo').innerHTML = next
+    ? 'Prossimo: <b>' + NAMES[next.type].charAt(0) + NAMES[next.type].slice(1).toLowerCase() + '</b> · ' + fmtTime(next.dur)
+    : 'Ultimo segmento 🏁';
+}
+
+function tick() {
+  if (paused || transitioning || !running) return;
+
+  remaining--;
+  elapsedTotal++;
+  timeMoving++;
+  const seg = segments[segIndex];
+  if (seg && seg.type === 'corsa') timeRun++;
+
+  // preavviso 15 secondi + flash
+  if (remaining === 15 && seg.dur > 25 && segments[segIndex + 1]) {
+    const next = segments[segIndex + 1];
+    say('Tra 15 secondi, ' + next.type);
+    document.body.classList.add('flash');
+    setTimeout(() => document.body.classList.remove('flash'), 700);
+    warned15 = true;
+  }
+
+  // beep ultimi 3 secondi
+  if (remaining > 0 && remaining <= 3) beep(880, 140);
+
+  if (remaining <= 0) {
+    endSegment();
+    return;
+  }
+  render();
+}
+
+function endSegment() {
+  transitioning = true;              // blocca il tick durante la transizione
+  const seg = segments[segIndex];
+
+  // annuncio di fine intervallo per corsa/camminata
+  if (seg.type === 'corsa' || seg.type === 'camminata') {
+    let msg = 'Fine ' + seg.type + '.';
+    const p = paceSpoken(distInterval, seg.dur);
+    if (p) msg += ' Passo: ' + p + '.';
+    const stepInt = Math.round(distInterval / (seg.type === 'corsa' ? strideRun : strideWalk));
+    if (stepInt > 0) msg += ' Passi stimati: ' + stepInt + '.';
+    const pt = paceSpoken(distTotal, timeMoving);
+    if (pt) msg += ' Passo totale: ' + pt + '.';
+    say(msg);
+  } else {
+    say('Fine ' + seg.type + '.');
+  }
+
+  beep(660, 200);
+
+  if (segIndex + 1 >= segments.length) {
+    finishSession();
+    return;
+  }
+
+  // 2 secondi di pausa tra una fase e la prossima
+  setTimeout(() => {
+    enterSegment(segIndex + 1);
+    transitioning = false;
+  }, 2000);
+}
+
+function render() {
+  $('timer').textContent = fmtTime(remaining);
+  $('elapsedTop').textContent = fmtLong(elapsedTotal);
+  const seg = segments[segIndex];
+  const pct = seg ? ((seg.dur - remaining) / seg.dur) * 100 : 0;
+  $('progressBar').style.width = pct + '%';
+  $('mPaceInt').textContent = paceStr(distInterval, seg ? seg.dur - remaining : 0);
+  $('mPaceTot').textContent = paceStr(distTotal, timeMoving);
+  $('mSteps').textContent = Math.round(steps);
+}
+
+function finishSession() {
+  running = false;
+  clearInterval(interval);
+  stopGPS();
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  say('Sessione completata. Ottimo lavoro!');
+
+  $('sTime').textContent = fmtLong(elapsedTotal);
+  $('sDist').textContent = (distTotal / 1000).toFixed(2);
+  $('sSteps').textContent = Math.round(steps);
+  $('sPaceRun').textContent = paceStr(distRun, timeRun);
+  $('sPaceTot').textContent = paceStr(distTotal, timeMoving);
+
+  $('session').classList.remove('active');
+  $('summary').classList.add('active');
+}
+
+/* ==================== CONTROLLI ==================== */
+$('btnTestVoice').addEventListener('click', () => {
+  say('Prova voce. Audio attivo, buon allenamento!');
+  beep(880, 150);
+  $('btnTestVoice').textContent = '✓ Voce sbloccata';
+  $('btnTestVoice').classList.add('ok');
+});
+
+$('btnStart').addEventListener('click', startSession);
+
+$('btnPause').addEventListener('click', () => {
+  if (!running) return;
+  paused = !paused;
+  $('btnPause').textContent = paused ? 'Riprendi' : 'Pausa';
+  $('btnPause').classList.toggle('paused', paused);
+  say(paused ? 'Pausa' : 'Si riparte');
+  if (paused) lastPos = null;   // evita salti GPS al rientro
+});
+
+$('btnStop').addEventListener('click', () => {
+  if (!running) return;
+  if (!stopArmed) {
+    stopArmed = true;
+    $('btnStop').textContent = 'Tocca ancora';
+    $('btnStop').classList.add('confirm');
+    stopTimer = setTimeout(() => {
+      stopArmed = false;
+      $('btnStop').textContent = 'Termina';
+      $('btnStop').classList.remove('confirm');
+    }, 2500);
+  } else {
+    clearTimeout(stopTimer);
+    stopArmed = false;
+    $('btnStop').textContent = 'Termina';
+    $('btnStop').classList.remove('confirm');
+    finishSession();
   }
 });
 
-// ===================== PIPELINE UI =====================
-function updatePipeline() {
-  document.getElementById('pipe-warm').className = 'pipe-item'+(currentPhase==='warmup'  ?' active-warm':'');
-  document.getElementById('pipe-run').className  = 'pipe-item'+(currentPhase==='run'     ?' active-run' :'');
-  document.getElementById('pipe-walk').className = 'pipe-item'+(currentPhase==='walk'    ?' active-walk':'');
-  document.getElementById('pipe-cool').className = 'pipe-item'+(currentPhase==='cooldown'?' active-cool':'');
-}
+$('btnNew').addEventListener('click', () => {
+  $('summary').classList.remove('active');
+  $('setup').style.display = 'flex';
+});
 
-// ===================== DOTS =====================
-function buildDots() {
-  const grid = document.getElementById('dotsGrid');
-  grid.innerHTML = '';
-  for (let r=0;r<cfg.reps;r++) {
-    ['run','walk'].forEach(t => {
-      const d = document.createElement('div');
-      d.className = 'interval-dot'; d.id = `dot-${t}-${r}`;
-      grid.appendChild(d);
-    });
+/* ==================== INIT ==================== */
+// ripristina impostazioni salvate
+try {
+  const s = JSON.parse(localStorage.getItem('irt-settings') || 'null');
+  if (s) {
+    $('inWarm').value = s.w; $('inReps').value = s.r; $('inRun').value = s.c;
+    $('inWalk').value = s.k; $('inCool').value = s.d;
+    $('inStrideRun').value = s.sr; $('inStrideWalk').value = s.sw;
   }
-}
-buildDots();
+} catch (e) {}
 
-function updateDots() {
-  if (currentPhase==='warmup') {
-    for(let r=0;r<cfg.reps;r++) {
-      document.getElementById(`dot-run-${r}`).className='interval-dot';
-      document.getElementById(`dot-walk-${r}`).className='interval-dot';
-    }
-    return;
-  }
-  for(let r=0;r<cfg.reps;r++) {
-    const dr=document.getElementById(`dot-run-${r}`);
-    const dw=document.getElementById(`dot-walk-${r}`);
-    if (r < currentRep) {
-      dr.className='interval-dot done-run'; dw.className='interval-dot done-walk';
-    } else if (r===currentRep && (currentPhase==='run'||currentPhase==='walk')) {
-      dr.className='interval-dot done-run'+(currentPhase==='run'?' active':'');
-      dw.className='interval-dot'+(currentPhase==='walk'?' done-walk active':'');
-    } else {
-      dr.className='interval-dot'; dw.className='interval-dot';
-    }
-  }
-}
-
-// ===================== HELPERS =====================
-function phaseColor(p) { return {warmup:'#f0b429',run:'#ff4d1c',walk:'#1caaff',cooldown:'#44dd88'}[p]||'#f0f0f0'; }
-function phaseLabel(p) { return {warmup:'🔥 RISCALDAMENTO',run:'🏃 CORSA',walk:'🚶 CAMMINATA',cooldown:'❄️ DEFATICAMENTO'}[p]||''; }
-function phaseDur(p)   { return {warmup:cfg.warm,run:cfg.run,walk:cfg.walk,cooldown:cfg.cool}[p]*1000; }
-function formatTime(ms) {
-  const s = Math.ceil(ms/1000);
-  if (s >= 60) return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
-  return String(Math.max(0,s));
-}
-
-// ===================== PHASE TRANSITION =====================
-function startPhase(phase, rep=0) {
-  currentPhase = phase; currentRep = rep;
-  phaseDuration = phaseDur(phase);
-  phaseStartTime = Date.now();
-  lastWarnSecond = -1;
-  lastPhaseStartBeep = false;
-  if (phase==='warmup')   signalWarmup();
-  else if (phase==='run') signalRun();
-  else if (phase==='walk') signalWalk();
-  else signalCooldown();
-  lastPhaseStartBeep = true;
-  updatePipeline(); updateDots();
-}
-
-function advancePhase() {
-  if (currentPhase==='warmup')        startPhase('run', 0);
-  else if (currentPhase==='run')      startPhase('walk', currentRep);
-  else if (currentPhase==='walk') {
-    const next = currentRep+1;
-    if (next >= cfg.reps) { cfg.cool>0 ? startPhase('cooldown') : finish(); }
-    else startPhase('run', next);
-  } else finish();
-}
-
-// ===================== MAIN LOOP (rAF-based) =====================
-function loop() {
-  if (!running) return;
-
-  const now = Date.now();
-  const elapsed = now - phaseStartTime;
-  const remaining = phaseDuration - elapsed;
-
-  // Phase over?
-  if (remaining <= 0) {
-    advancePhase();
-    if (running) rafId = requestAnimationFrame(loop);
-    return;
-  }
-
-  // Warning beeps at 3, 2, 1 seconds remaining
-  const secLeft = Math.ceil(remaining / 1000);
-  if (secLeft <= 3 && secLeft > 0 && secLeft !== lastWarnSecond) {
-    lastWarnSecond = secLeft;
-    signalWarning();
-  }
-
-  // Update display
-  const color = phaseColor(currentPhase);
-  const frac = remaining / phaseDuration;
-  setRing(frac, color);
-  document.getElementById('phaseLabel').textContent = phaseLabel(currentPhase);
-  document.getElementById('phaseLabel').style.color = color;
-  document.getElementById('timeDisplay').textContent = formatTime(remaining);
-  document.getElementById('timeDisplay').style.color = color;
-  const isInterval = currentPhase==='run'||currentPhase==='walk';
-  document.getElementById('intervalCount').textContent = isInterval
-    ? `intervallo ${currentRep+1} / ${cfg.reps}`
-    : (currentPhase==='warmup'?'riscaldamento':'defaticamento');
-
-  rafId = requestAnimationFrame(loop);
-}
-
-// ===================== FINISH =====================
-function finish() {
-  running = false;
-  cancelAnimationFrame(rafId);
-  releaseWakeLock();
-  document.getElementById('startBtn').textContent = 'INIZIA';
-  document.getElementById('phaseLabel').textContent = '✓ COMPLETATO';
-  document.getElementById('phaseLabel').style.color = '#44dd88';
-  document.getElementById('timeDisplay').textContent = '🎉';
-  document.getElementById('timeDisplay').style.color = '#f0f0f0';
-  document.getElementById('intervalCount').textContent = `${cfg.reps} intervalli completati`;
-  setRing(1,'#44dd88');
-  for(let r=0;r<cfg.reps;r++){
-    document.getElementById(`dot-run-${r}`).className='interval-dot done-run';
-    document.getElementById(`dot-walk-${r}`).className='interval-dot done-walk';
-  }
-  document.getElementById('doneMsg').style.display='block';
-  signalDone();
-}
-
-// ===================== TOGGLE START/PAUSE =====================
-async function toggleStart() {
-  if (actx.state==='suspended') await actx.resume();
-  if (!running) {
-    running = true;
-    document.getElementById('startBtn').textContent = 'PAUSA';
-    document.getElementById('doneMsg').style.display = 'none';
-    await requestWakeLock();
-
-    if (pausedRemaining > 0) {
-      // Resume from pause: recalculate phaseStartTime
-      phaseStartTime = Date.now() - (phaseDuration - pausedRemaining);
-      pausedRemaining = 0;
-    } else {
-      // Fresh start
-      buildDots();
-      cfg.warm > 0 ? startPhase('warmup') : startPhase('run', 0);
-    }
-    rafId = requestAnimationFrame(loop);
-  } else {
-    // Pause
-    running = false;
-    cancelAnimationFrame(rafId);
-    releaseWakeLock();
-    pausedRemaining = phaseDuration - (Date.now() - phaseStartTime);
-    document.getElementById('startBtn').textContent = 'RIPRENDI';
-  }
-}
-
-// ===================== RESET =====================
-function resetAll() {
-  running = false;
-  cancelAnimationFrame(rafId);
-  releaseWakeLock();
-  pausedRemaining = 0; phaseDuration = 0;
-  currentPhase='warmup'; currentRep=0;
-  document.getElementById('startBtn').textContent = 'INIZIA';
-  document.getElementById('phaseLabel').textContent = 'PRONTO';
-  document.getElementById('phaseLabel').style.color = '#f0f0f0';
-  document.getElementById('timeDisplay').textContent = '—';
-  document.getElementById('timeDisplay').style.color = '#f0f0f0';
-  document.getElementById('intervalCount').textContent = '— / —';
-  document.getElementById('doneMsg').style.display = 'none';
-  ring.style.strokeDashoffset = CIRC; ring.style.stroke = '#333';
-  ['warm','run','walk','cool'].forEach(k=>document.getElementById('pipe-'+k).className='pipe-item');
-  document.getElementById('wakeBadge').textContent = '⚫ schermo libero di spegnersi';
-  document.getElementById('wakeBadge').className = 'wakelock-badge';
-  buildDots();
+// registra il service worker (solo su HTTPS)
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 </script>
 </body>

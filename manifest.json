@@ -1,0 +1,24 @@
+{
+  "name": "Interval Run Trainer",
+  "short_name": "RunTrainer",
+  "description": "Interval trainer con voce italiana, passo GPS e stima passi",
+  "start_url": "/interval_run/index.html",
+  "display": "standalone",
+  "background_color": "#0a0e14",
+  "theme_color": "#ff5a3c",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
