@@ -281,6 +281,46 @@
     background: var(--run);
     color: #fff;
   }
+
+  /* ============ DETTAGLIO INTERVALLI ============ */
+  .breakdown-list {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .breakdown-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .bd-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+    gap: 8px;
+  }
+  .bd-top .bd-label { font-weight: 700; letter-spacing: 0.02em; }
+  .bd-top .bd-partial { color: var(--muted); font-size: 0.68rem; font-weight: 400; }
+  .bd-top .bd-dur { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .bd-bar-track {
+    height: 8px;
+    background: var(--bg);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .bd-bar { height: 100%; border-radius: 6px; }
+  .bd-metrics {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .bd-metrics b { color: var(--text); font-weight: 700; }
 </style>
 </head>
 <body>
@@ -301,8 +341,8 @@
 
   <div class="legend">Lunghezza passo (per stima passi)</div>
   <div class="group">
-    <div class="field"><label>Corsa (m)</label><input id="inStrideRun" type="number" inputmode="decimal" step="0.01" value="1.20"></div>
-    <div class="field"><label>Camminata (m)</label><input id="inStrideWalk" type="number" inputmode="decimal" step="0.01" value="0.76"></div>
+    <div class="field"><label>Corsa (m)</label><input id="inStrideRun" type="number" inputmode="decimal" step="0.01" value="0.89"></div>
+    <div class="field"><label>Camminata (m)</label><input id="inStrideWalk" type="number" inputmode="decimal" step="0.01" value="1.00"></div>
   </div>
 
   <button id="btnTestVoice">🔊 Test voce (tocca prima di avviare)</button>
@@ -346,6 +386,10 @@
     <div class="sumitem"><div class="val" id="sPaceTot">—</div><div class="lbl">Passo totale</div></div>
     <div class="sumitem wide"><div class="val" id="sCadRun">—</div><div class="lbl">Cadenza media corsa (spm)</div></div>
   </div>
+
+  <div class="legend">Dettaglio intervalli</div>
+  <div id="breakdownList" class="breakdown-list"></div>
+
   <button id="btnNew">Nuova sessione</button>
 </div>
 
@@ -380,7 +424,11 @@ let distRun = 0;          // metri solo corsa
 let timeRun = 0;          // secondi solo corsa
 let timeMoving = 0;       // secondi con GPS attivo (tutte le fasi)
 let steps = 0;            // passi stimati totali
-let strideRun = 1.20, strideWalk = 0.76;
+let strideRun = 0.89, strideWalk = 1.00;
+
+/* Dettaglio per singolo intervallo (per il riepilogo finale) */
+let segStats = [];            // [{type, rep, reps, dur, dist, partial}]
+let currentSegRecorded = false;
 
 /* Voce: coda ordinata, niente sovrapposizioni */
 const voiceQueue = [];
@@ -457,6 +505,19 @@ function cadence(meters, type, seconds) {
   const stride = type === 'corsa' ? strideRun : strideWalk;
   const spm = Math.round((meters / stride) / (seconds / 60));
   return (spm > 20 && spm < 300) ? spm : null;
+}
+function recordSegment(seg, dist, dur, partial) {
+  // registra le statistiche del segmento appena concluso (o interrotto) per il riepilogo
+  if (currentSegRecorded || !seg) return;
+  currentSegRecorded = true;
+  segStats.push({
+    type: seg.type,
+    rep: seg.rep || null,
+    reps: seg.reps || null,
+    dur: Math.max(0, Math.round(dur)),
+    dist: Math.max(0, dist),
+    partial: !!partial
+  });
 }
 
 /* ==================== GPS ==================== */
@@ -541,8 +602,8 @@ function buildSegments() {
 }
 
 function startSession() {
-  strideRun  = parseFloat($('inStrideRun').value)  || 1.20;
-  strideWalk = parseFloat($('inStrideWalk').value) || 0.76;
+  strideRun  = parseFloat($('inStrideRun').value)  || 0.89;
+  strideWalk = parseFloat($('inStrideWalk').value) || 1.00;
   buildSegments();
 
   // salva impostazioni
@@ -556,6 +617,7 @@ function startSession() {
   segIndex = 0; elapsedTotal = 0;
   distTotal = distInterval = distRun = 0;
   timeRun = timeMoving = 0; steps = 0;
+  segStats = []; currentSegRecorded = false;
   lastPos = null; paused = false; transitioning = false; running = true;
 
   $('setup').style.display = 'none';
@@ -575,6 +637,7 @@ function enterSegment(i, announce = true) {
   remaining = seg.dur;
   distInterval = 0;
   warned15 = false;
+  currentSegRecorded = false;
 
   const color = COLORS[seg.type];
   $('phaseLabel').textContent = NAMES[seg.type];
@@ -627,6 +690,7 @@ function tick() {
 function endSegment() {
   transitioning = true;              // blocca il tick durante la transizione
   const seg = segments[segIndex];
+  recordSegment(seg, distInterval, seg.dur, false);
 
   // annuncio di fine intervallo per corsa/camminata
   if (seg.type === 'corsa' || seg.type === 'camminata') {
@@ -669,6 +733,16 @@ function render() {
 }
 
 function finishSession() {
+  // se la sessione viene fermata a metà di un intervallo, registra comunque
+  // il pezzo di segmento percorso finora, come "parziale"
+  if (running) {
+    const seg = segments[segIndex];
+    if (seg && !currentSegRecorded) {
+      const durSoFar = seg.dur - Math.max(0, remaining);
+      recordSegment(seg, distInterval, durSoFar, true);
+    }
+  }
+
   running = false;
   clearInterval(interval);
   stopGPS();
@@ -682,9 +756,46 @@ function finishSession() {
   $('sPaceTot').textContent = paceStr(distTotal, timeMoving);
   const cr = cadence(distRun, 'corsa', timeRun);
   $('sCadRun').textContent = cr ? cr : '—';
+  renderBreakdown();
 
   $('session').classList.remove('active');
   $('summary').classList.add('active');
+}
+
+function renderBreakdown() {
+  const wrap = $('breakdownList');
+  wrap.innerHTML = '';
+
+  // velocità massima registrata, per scalare le barre in proporzione
+  let maxSpeed = 0;
+  segStats.forEach(s => {
+    if (s.dist > 0 && s.dur > 0) maxSpeed = Math.max(maxSpeed, (s.dist / 1000) / (s.dur / 3600));
+  });
+  if (maxSpeed <= 0) maxSpeed = 1;
+
+  segStats.forEach(s => {
+    const baseName = NAMES[s.type].charAt(0) + NAMES[s.type].slice(1).toLowerCase();
+    const label = s.rep ? baseName + ' ' + s.rep + '/' + s.reps : baseName;
+    const speed = (s.dist > 0 && s.dur > 0) ? (s.dist / 1000) / (s.dur / 3600) : 0;
+    const pct = speed > 0 ? Math.max(6, Math.round((speed / maxSpeed) * 100)) : 3;
+    const pace = paceStr(s.dist, s.dur);
+    const cad = cadence(s.dist, s.type, s.dur);
+
+    const row = document.createElement('div');
+    row.className = 'breakdown-row';
+    row.innerHTML =
+      '<div class="bd-top">' +
+        '<span class="bd-label">' + label + (s.partial ? ' <span class="bd-partial">(parziale)</span>' : '') + '</span>' +
+        '<span class="bd-dur">' + fmtTime(s.dur) + '</span>' +
+      '</div>' +
+      '<div class="bd-bar-track"><div class="bd-bar" style="width:' + pct + '%; background:' + COLORS[s.type] + '"></div></div>' +
+      '<div class="bd-metrics">' +
+        '<span>' + (s.dist / 1000).toFixed(2) + ' km</span>' +
+        '<b>' + pace + '</b>' +
+        '<span>' + (cad ? cad + ' spm' : '—') + '</span>' +
+      '</div>';
+    wrap.appendChild(row);
+  });
 }
 
 /* ==================== CONTROLLI ==================== */
